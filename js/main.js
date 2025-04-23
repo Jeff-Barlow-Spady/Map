@@ -31,62 +31,10 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 async function fetchTreeRecords() {
-  // Fetch data from Airtable
-  const baseId = "appQryFCb5Fi3nZ4c";
-  const tableName = "tbljBWCUMUSwrF2co";
-  const mapViewId = "viw8Jbt3m4xWa1f1h";
-  let airtableUrl = `https://api.airtable.com/v0/${baseId}/${tableName}?view=${mapViewId}`;
-
-  // fields to include when querying Tree data from Airtable
-  const queryFields = [
-    "Map Icon",
-    "Tree Name",
-    "Description",
-    "Genus species (text)",
-    "Species Description",
-    "Tree Latitude",
-    "Tree Longitude",
-    "Photo",
-    "Address",
-    "Age",
-    "Condition",
-    "Height (m)",
-    "Tree Cir (m)",
-    "Canopy Spread (m)",
-    "Tree DBH (m)",
-    "Species Score",
-  ];
-
-  // limit results to fields included in the queryFields array
-  queryFields.forEach((field) => {
-    airtableUrl += `&fields[]=${field}`;
-  });
-
-  const airTablePersonalAccessToken =
-    "patS6srnbXVthid6g.8b1b2fe74ad1685642ceadbb93e63b8223ee21d14a569f9debe2e948a563170a";
-  let offset = "";
-
-  const headers = {
-    Authorization: `Bearer ${airTablePersonalAccessToken}`,
-  };
-  let response = await fetch(airtableUrl, {
-    headers,
-  });
+  // Fetch data from backend endpoint
+  let response = await fetch('/backend/trees');
   let data = await response.json();
-  Trees.records = data.records;
-  offset = data.offset;
-
-  // airtable has 100 record limit per request. offset is returned until all records are fetched
-  while (offset) {
-    const url = airtableUrl + `&offset=${offset}`;
-    let response = await fetch(url, {
-      headers,
-    });
-    let data = await response.json();
-    Trees.records = [...Trees.records, ...data.records];
-    offset = data.offset;
-  }
-
+  Trees.records = data;
   addTreeMarkers();
 }
 
@@ -361,6 +309,40 @@ function createTreeInfoHTML(feature) {
       html.push(`<p>${speciesDescription}</p>`);
     }
   }
+
+  // STORY SUBMISSION
+  html.push(`
+    <div class="mt-4">
+      <h5>Tree Stories</h5>
+      <div id="stories-${feature.getId()}" class="mb-3" aria-live="polite" aria-busy="true">
+        <div class="text-center text-muted" id="stories-loading-${feature.getId()}">
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <small>Loading stories...</small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="storyInput-${feature.getId()}" class="visually-hidden">Share your story about this tree</label>
+        <textarea 
+          id="storyInput-${feature.getId()}" 
+          class="form-control" 
+          rows="3" 
+          placeholder="Share your story about this tree..."
+          aria-label="Share your story about this tree"
+          oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';"
+        ></textarea>
+      </div>
+      <button 
+        id="submitStoryBtn-${feature.getId()}"
+        onclick="submitStory('${feature.getId()}')" 
+        class="btn btn-sm btn-success mt-2"
+        aria-label="Submit story for this tree"
+      >
+        Share Story
+      </button>
+      <div id="story-feedback-${feature.getId()}" class="mt-2" role="alert" style="display:none;"></div>
+    </div>
+  `);
+
   return html.join("");
 }
 
@@ -877,6 +859,101 @@ function setSelectedLocation() {
 
 function clearSelectedLocation() {
   NewTree.layerSource.clear();
+}
+
+// STORY SUBMISSION FUNCTIONS
+async function submitStory(treeId) {
+  const input = document.getElementById(`storyInput-${treeId}`);
+  const button = document.getElementById(`submitStoryBtn-${treeId}`);
+  const feedback = document.getElementById(`story-feedback-${treeId}`);
+  const content = input.value.trim();
+
+  if (!content) {
+    feedback.style.display = 'block';
+    feedback.className = 'alert alert-warning mt-2';
+    feedback.textContent = 'Please write a story before submitting.';
+    input.focus();
+    return;
+  }
+
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+  feedback.style.display = 'none';
+
+  try {
+    await fetch('/backend/saveStory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        treeId: treeId,
+        message: content,
+        contact: ''
+      })
+    });
+
+    // Clear input and refresh stories
+    input.value = '';
+    feedback.style.display = 'block';
+    feedback.className = 'alert alert-success mt-2';
+    feedback.textContent = 'Story submitted! Thank you.';
+    input.focus();
+    await displayStories(treeId);
+  } catch (error) {
+    console.error('Failed to submit story:', error);
+    feedback.style.display = 'block';
+    feedback.className = 'alert alert-danger mt-2';
+    feedback.textContent = 'Failed to save story. Please try again.';
+    input.focus();
+  } finally {
+    button.disabled = false;
+    button.innerHTML = 'Share Story';
+  }
+}
+
+async function displayStories(treeId) {
+  const storiesDiv = document.getElementById(`stories-${treeId}`);
+  const loadingDiv = document.getElementById(`stories-loading-${treeId}`);
+  if (loadingDiv) loadingDiv.style.display = 'block';
+  storiesDiv.setAttribute('aria-busy', 'true');
+
+  try {
+    const response = await fetch(`/backend/stories?treeId=${encodeURIComponent(treeId)}`);
+    const data = await response.json();
+
+    if (!data || !data.length) {
+      storiesDiv.innerHTML = `
+        <div class="text-center text-muted">
+          <small>No stories shared yet. Be the first!</small>
+        </div>
+      `;
+      storiesDiv.setAttribute('aria-busy', 'false');
+      return;
+    }
+
+    storiesDiv.innerHTML = data
+      .map(story => `
+        <div class="story-item mb-3 p-3 bg-light rounded">
+          <div class="story-content">${story.message}</div>
+          <div class="text-muted mt-2">
+            <small>Shared on ${story.created ? new Date(story.created).toLocaleDateString() : ''}</small>
+          </div>
+        </div>
+      `)
+      .join('');
+    storiesDiv.setAttribute('aria-busy', 'false');
+  } catch (error) {
+    console.error('Failed to fetch stories:', error);
+    storiesDiv.innerHTML = `
+      <div class="alert alert-warning">
+        Unable to load stories. Please try again later.
+      </div>
+    `;
+    storiesDiv.setAttribute('aria-busy', 'false');
+  } finally {
+    if (loadingDiv) loadingDiv.style.display = 'none';
+  }
 }
 
 // hide carousel controls by default

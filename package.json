@@ -12,6 +12,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
-    "parcel-bundler": "^1.12.4"
+    "@types/jest": "^29.5.14",
+    "@types/nodemailer": "^6.4.17",
+    "node-mocks-http": "^1.16.2",
+    "parcel-bundler": "^1.12.4",
+    "ts-jest": "^29.3.2"
+  },
+  "dependencies": {
+    "nodemailer": "^6.10.1"
   }
 }
