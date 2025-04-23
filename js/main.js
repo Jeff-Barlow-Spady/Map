@@ -31,10 +31,47 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 async function fetchTreeRecords() {
-  // Fetch data from backend endpoint
-  let response = await fetch('/backend/trees');
+  // Fetch data from Airtable with specific fields and handle pagination
+  const baseId = window.AIRTABLE_BASE_ID;
+  const tableName = window.AIRTABLE_TREES_TABLE;
+  const viewId = window.AIRTABLE_TREES_VIEW;
+  let airtableUrl = `https://api.airtable.com/v0/${baseId}/${tableName}?view=${viewId}`;
+  // fields to retrieve
+  const queryFields = [
+    'Map Icon',
+    'Tree Name',
+    'Description',
+    'Genus species (text)',
+    'Species Description',
+    'Tree Latitude',
+    'Tree Longitude',
+    'Photo',
+    'Address',
+    'Age',
+    'Condition',
+    'Height (m)',
+    'Tree Cir (m)',
+    'Canopy Spread (m)',
+    'Tree DBH (m)',
+    'Species Score'
+  ];
+  queryFields.forEach(field => {
+    airtableUrl += `&fields[]=${encodeURIComponent(field)}`;
+  });
+  const headers = { Authorization: `Bearer ${window.AIRTABLE_API_KEY}` };
+  let response = await fetch(airtableUrl, { headers });
   let data = await response.json();
-  Trees.records = data;
+  Trees.records = data.records || [];
+  let offset = data.offset;
+  // continue fetching pages if offset present
+  while (offset) {
+    const pagedUrl = `${airtableUrl}&offset=${offset}`;
+    const res = await fetch(pagedUrl, { headers });
+    const pageData = await res.json();
+    Trees.records = [...Trees.records, ...(pageData.records || [])];
+    offset = pageData.offset;
+  }
+  console.log(`Loaded ${Trees.records.length} tree records from Airtable`);
   addTreeMarkers();
 }
 
@@ -881,7 +918,7 @@ async function submitStory(treeId) {
   feedback.style.display = 'none';
 
   try {
-    await fetch('/backend/saveStory', {
+    await fetch(`${API_BASE_URL}/backend/saveStory`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -919,7 +956,7 @@ async function displayStories(treeId) {
   storiesDiv.setAttribute('aria-busy', 'true');
 
   try {
-    const response = await fetch(`/backend/stories?treeId=${encodeURIComponent(treeId)}`);
+    const response = await fetch(`${API_BASE_URL}/backend/stories?treeId=${encodeURIComponent(treeId)}`);
     const data = await response.json();
 
     if (!data || !data.length) {

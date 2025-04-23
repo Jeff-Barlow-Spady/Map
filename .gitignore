@@ -5,3 +5,4 @@ node_modules
 dist
 .cache
 .vscode/launch.json
+tree_explorer.db
