@@ -8,4 +8,7 @@ dist
 tree_explorer.db
 .env
 .env.local
-.env.example
+
+.env.local
+.env
+backup
