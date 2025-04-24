@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { saveMessage } from './db';
-import Airtable from 'airtable';
+import * as Airtable from 'airtable';
 import 'dotenv/config';
 
 export default function handler(req: IncomingMessage, res: ServerResponse) {

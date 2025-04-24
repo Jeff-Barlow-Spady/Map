@@ -1,6 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http';
+import 'dotenv/config';
+import { pipeline } from '@huggingface/transformers';
 
-const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
+const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'smollm2:135m';
 
 export default function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== 'POST') {
@@ -41,22 +43,13 @@ Key traits to incorporate in your responses:
 Remember: Never fabricate information. If a detail wasn't provided in your data, find a graceful way to acknowledge that limitation while staying in character.
 
 User's question: ${prompt}`;
-      const response = await fetch(`${OLLAMA_API_URL}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'smollm2:135m',
-          prompt: systemPrompt,
-          stream: false,
-          temperature: 0.3,
-          top_p: 0.9,
-        }),
+      // Hugging Face inference
+      const generation = await pipeline('text-generation', {
+        model: HF_MODEL,
+        inputs: systemPrompt,
+        parameters: { temperature: 0.3, top_p: 0.9 },
       });
-      if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.statusText}`);
-      }
-      const data = await response.json();
-      const cleanedResponse = data.response
+      const cleanedResponse = (Array.isArray(generation) ? generation[0] : generation)
         .replace(/^As an AI language model,|^As a tree,/gi, '')
         .trim();
       res.statusCode = 200;

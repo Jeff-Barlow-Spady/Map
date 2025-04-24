@@ -380,6 +380,22 @@ function createTreeInfoHTML(feature) {
     </div>
   `);
 
+  // EMAIL CONTACT FORM
+  html.push(`
+    <div class="mt-4">
+      <h5>Email This Tree</h5>
+      <div class="form-group">
+        <label for="emailInput-${feature.getId()}">Your Email</label>
+        <input type="email" id="emailInput-${feature.getId()}" class="form-control" placeholder="Your email..." />
+      </div>
+      <div class="form-group mt-2">
+        <label for="emailMessage-${feature.getId()}">Message</label>
+        <textarea id="emailMessage-${feature.getId()}" class="form-control" rows="3" placeholder="Write a message..."></textarea>
+      </div>
+      <button id="sendEmailBtn-${feature.getId()}" onclick="sendEmail('${feature.getId()}', '${feature.get("Tree Name")}')" class="btn btn-sm btn-primary mt-2">Send Email</button>
+      <div id="email-feedback-${feature.getId()}" class="mt-2" style="display:none;"></div>
+    </div>
+  `);
   return html.join("");
 }
 
@@ -990,6 +1006,48 @@ async function displayStories(treeId) {
     storiesDiv.setAttribute('aria-busy', 'false');
   } finally {
     if (loadingDiv) loadingDiv.style.display = 'none';
+  }
+}
+
+// EMAIL SUBMISSION FUNCTIONS
+async function sendEmail(treeId, treeName) {
+  const emailInput = document.getElementById(`emailInput-${treeId}`);
+  const messageInput = document.getElementById(`emailMessage-${treeId}`);
+  const button = document.getElementById(`sendEmailBtn-${treeId}`);
+  const feedback = document.getElementById(`email-feedback-${treeId}`);
+  const email = emailInput.value.trim();
+  const message = messageInput.value.trim();
+
+  if (!email || !message) {
+    feedback.style.display = 'block';
+    feedback.className = 'alert alert-warning mt-2';
+    feedback.textContent = 'Please enter your email and message.';
+    return;
+  }
+
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+  feedback.style.display = 'none';
+
+  try {
+    await fetch(`${API_BASE_URL}/backend/sendEmail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ treeId, treeName, email, message })
+    });
+    feedback.style.display = 'block';
+    feedback.className = 'alert alert-success mt-2';
+    feedback.textContent = 'Email sent successfully!';
+    emailInput.value = '';
+    messageInput.value = '';
+  } catch (error) {
+    console.error('Failed to send email:', error);
+    feedback.style.display = 'block';
+    feedback.className = 'alert alert-danger mt-2';
+    feedback.textContent = 'Failed to send email. Please try again.';
+  } finally {
+    button.disabled = false;
+    button.innerHTML = 'Send Email';
   }
 }
 

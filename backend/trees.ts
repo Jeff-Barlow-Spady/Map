@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import Airtable from 'airtable';
+import * as Airtable from 'airtable';
 import 'dotenv/config';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
@@ -24,7 +24,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
     const boundsParam = url.searchParams.get('bounds');
     const result = boundsParam
-      ? data.filter(item => {
+      ? data.filter((item: any) => {
           const lat = item.fields['Tree Latitude'] ?? item.fields.Latitude;
           const lng = item.fields['Tree Longitude'] ?? item.fields.Longitude;
           const b = JSON.parse(boundsParam);
